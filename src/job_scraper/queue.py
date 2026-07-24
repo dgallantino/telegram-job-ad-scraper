@@ -70,6 +70,7 @@ async def process_job(job: Job, sheets: SheetsClient, on_finish: OnFinish) -> No
         logger.exception("crawl failed for job %s", job.job_id)
 
     sheets.update_result(job.job_id, status, fields)
+    logger.info("crawl %s for job %s url=%s", status, job.job_id, job.url)
     await on_finish(job, status)
 
 

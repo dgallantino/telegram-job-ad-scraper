@@ -34,8 +34,8 @@ logger = logging.getLogger(__name__)
 _URL_ENTITY_TYPES = [MessageEntity.URL, MessageEntity.TEXT_LINK]
 
 _MSG_ACCEPTED = "Accepted — queued for crawl."
-_MSG_CRAWL_FINISHED = "Crawl finished (stub)."
-_MSG_CRAWL_FAILED = "Crawl failed (stub)."
+_MSG_CRAWL_FINISHED = "Scrape finished"
+_MSG_CRAWL_FAILED = "Scrape failed"
 _MSG_HEALTH_OK = "ok"
 
 _REASON_NOT_VALID = "not a valid URL"
