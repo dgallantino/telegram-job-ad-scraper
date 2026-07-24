@@ -18,7 +18,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class Job:
-    """A single unit of crawl work, mirroring the relevant Sheet A columns."""
+    """A single unit of crawl work, mirroring the relevant Sheet A columns.
+
+    ``job_id`` is the string ``f"{chat_id}_{message_id}"``. ``chat_id`` and
+    ``message_id`` are kept separately for replies / Bot API calls.
+    """
 
     job_id: str
     url: str
