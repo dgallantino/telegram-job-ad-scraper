@@ -22,6 +22,7 @@ from job_scraper.telegram_bot import (
     _MSG_HEALTH_OK,
     extract_urls,
     on_crawl_finish,
+    parse_job_id,
     reply_accepted,
     reply_crawl_result,
     reply_health,
@@ -548,3 +549,20 @@ async def test_offset_uses_last_update_id_plus_one(tmp_path: Path) -> None:
     )
 
     assert seen_offsets[0] == 51
+
+
+def test_parse_job_id_single_url() -> None:
+    assert parse_job_id("-100123_42") == ("-100123", 42)
+
+
+def test_parse_job_id_multi_url() -> None:
+    assert parse_job_id("-100123_42_1") == ("-100123", 42)
+
+
+def test_parse_job_id_invalid() -> None:
+    with pytest.raises(ValueError):
+        parse_job_id("not-a-job-id")
+    with pytest.raises(ValueError):
+        parse_job_id("")
+    with pytest.raises(ValueError):
+        parse_job_id("-100123_0")
