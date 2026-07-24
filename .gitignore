@@ -1,0 +1,20 @@
+# Environment / secrets
+.env
+*.json
+!package*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+venv/
+.venv/
+build/
+dist/
+
+# State / runtime data
+/data/
+
+# Editor / OS
+.DS_Store
