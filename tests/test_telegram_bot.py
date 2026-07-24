@@ -12,9 +12,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from telegram import Chat, Message, MessageEntity, Update, User
 
-from job_scrapper.config import Settings
-from job_scrapper.queue import Job
-from job_scrapper.telegram_bot import (
+from job_scraper.config import Settings
+from job_scraper.queue import Job
+from job_scraper.telegram_bot import (
     _MSG_ACCEPTED,
     _MSG_CRAWL_FAILED,
     _MSG_CRAWL_FINISHED,

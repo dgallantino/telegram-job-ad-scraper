@@ -22,17 +22,19 @@ from Sheet A but is entirely out of scope for this project.
 ```
 telegram-job-ad-scrapper/
 ├── src/
-│   └── job_scrapper/
+│   └── job_scraper/
 │       ├── main.py            # entrypoint: wires everything, runs the event loop
 │       ├── config.py          # env var loading / settings
 │       ├── state.py           # local JSON state file read/write
 │       ├── telegram_bot.py    # listener: get_updates, validate, reply, enqueue
 │       ├── queue.py           # asyncio.Queue wiring + worker loop
 │       ├── sheets.py          # Sheet A read/write client (gspread)
-│       └── crawler/
+│       └── scraper/
 │           ├── dispatch.py    # site allowlist -> parser lookup
+│           ├── fetch.py       # async httpx fetch of a single URL
 │           └── sites/
-│               └── example_site.py  # one stub parser
+│               ├── example_site.py  # placeholder parser
+│               └── jobstreet.py     # id.jobstreet.com parser
 ├── pyproject.toml
 ├── Containerfile
 ├── README.md
@@ -51,7 +53,7 @@ telegram-job-ad-scrapper/
 
 - Single process, asyncio-based. One task is the Telegram listener
   (validates + replies + enqueues). One or more worker tasks are the
-  crawler, consuming an in-memory `asyncio.Queue`. Runs as a single Podman
+  scraper, consuming an in-memory `asyncio.Queue`. Runs as a single Podman
   container.
 - Crash recovery: on startup, the process scans Sheet A for rows with
   `crawl_status` in (`pending`, `running`) and re-enqueues them before
@@ -101,9 +103,8 @@ telegram-job-ad-scrapper/
 - No external infra dependency (no self-hosted DB, no Redis). Google Sheets
   is the only external service, used deliberately as the data store.
 - Only one Telegram group is ever listened to.
-- The crawler only supports an explicit, small allowlist of sites (exact
-  sites TBD — currently only a placeholder dispatch mechanism exists).
-- The crawler never follows links found on a page; it only parses the given
+- The scraper only supports an explicit, small allowlist of sites.
+- The scraper never follows links found on a page; it only parses the given
   URL.
 
 ## Configuration
@@ -118,7 +119,7 @@ Copy `.env.example` to `.env` and fill in real values:
 | `TELEGRAM_BOT_TOKEN` | yes | Bot API token. |
 | `TELEGRAM_CHAT_ID` | yes | The one target group's chat ID. |
 | `STATE_FILE_PATH` | no (default `/data/state.json`) | Path to the local JSON state file. |
-| `WORKER_COUNT` | no (default `1`) | Number of crawler worker tasks. |
+| `WORKER_COUNT` | no (default `1`) | Number of scraper worker tasks. |
 | `TELEGRAM_POLL_TIMEOUT` | no (default `30`) | `getUpdates` long-poll timeout, in seconds. |
 
 Never commit `.env` or the service-account JSON key — both are gitignored.
@@ -128,7 +129,7 @@ Never commit `.env` or the service-account JSON key — both are gitignored.
 Build the image:
 
 ```bash
-podman build -t job-scrapper -f Containerfile .
+podman build -t job-scraper -f Containerfile .
 ```
 
 Run it, mounting the state directory and injecting secrets via env vars
@@ -136,15 +137,15 @@ Run it, mounting the state directory and injecting secrets via env vars
 
 ```bash
 podman run -d \
-  --name job-scrapper \
-  -v job-scrapper-data:/data \
+  --name job-scraper \
+  -v job-scraper-data:/data \
   -v /path/to/service-account.json:/secrets/service-account.json:ro \
   -e GOOGLE_SERVICE_ACCOUNT_KEY=/secrets/service-account.json \
   -e GOOGLE_SHEETS_SPREADSHEET_ID=... \
   -e GOOGLE_SHEETS_SHEET_NAME=Sheet1 \
   -e TELEGRAM_BOT_TOKEN=... \
   -e TELEGRAM_CHAT_ID=... \
-  job-scrapper
+  job-scraper
 ```
 
 ## Known limitations
@@ -162,8 +163,9 @@ This is a scaffold. The following are real, working code:
 
 - `config.py` — env var loading, validation, and defaults.
 - `state.py` — JSON state-file read/write.
-- `crawler/dispatch.py` — URL well-formedness check and site-allowlist
+- `scraper/dispatch.py` — URL well-formedness check and site-allowlist
   lookup mechanism.
+- `scraper/sites/jobstreet.py` — `id.jobstreet.com` job-detail parser.
 - `queue.py` — `asyncio.Queue` creation and worker-pool spawn/shutdown
   plumbing.
 
@@ -175,8 +177,7 @@ bodies) with no real behavior yet:
 - `telegram_bot.py` — `Bot` construction is real, but `run_listener` does
   not yet poll, validate, reply, or enqueue anything.
 - `queue.py`'s `process_job` — does not yet crawl, parse, or write results.
-- `crawler/sites/example_site.py` — a single placeholder parser returning
-  empty fields; the real supported-site list and real parsers do not exist
-  yet.
+- `scraper/sites/example_site.py` — a single placeholder parser returning
+  empty fields.
 - `main.py`'s Sheet-A re-enqueue-on-startup step and the listener startup
   call are both `TODO`.
