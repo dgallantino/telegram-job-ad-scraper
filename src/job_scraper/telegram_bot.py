@@ -118,6 +118,11 @@ async def reply_crawl_result(
     )
 
 
+async def on_crawl_finish(bot: Bot, job: Job, status: str) -> None:
+    """Queue ``on_finish`` helper: reply with crawl status for ``job``."""
+    await reply_crawl_result(bot, job.chat_id, status, message_id=job.message_id)
+
+
 async def reply_health(
     bot: Bot,
     chat_id: int | str,

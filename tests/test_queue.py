@@ -28,17 +28,11 @@ def _sheets() -> MagicMock:
     return MagicMock()
 
 
-def _bot() -> MagicMock:
-    bot = MagicMock()
-    bot.send_message = AsyncMock()
-    return bot
-
-
 @pytest.mark.asyncio
 async def test_process_job_finished() -> None:
     job = _job()
     sheets = _sheets()
-    bot = _bot()
+    on_finish = AsyncMock()
     fields = {
         "job_title": "Engineer",
         "job_description": "Build things",
@@ -57,12 +51,8 @@ async def test_process_job_finished() -> None:
             new_callable=AsyncMock,
             return_value="<html/>",
         ) as fetch,
-        patch(
-            "job_scraper.telegram_bot.reply_crawl_result",
-            new_callable=AsyncMock,
-        ) as reply,
     ):
-        await process_job(job, sheets, bot)
+        await process_job(job, sheets, on_finish)
 
     sheets.update_status.assert_called_once_with(job.job_id, CRAWL_STATUS_RUNNING)
     get_parser.assert_called_once_with(job.url)
@@ -71,16 +61,14 @@ async def test_process_job_finished() -> None:
     sheets.update_result.assert_called_once_with(
         job.job_id, CRAWL_STATUS_FINISHED, fields
     )
-    reply.assert_awaited_once_with(
-        bot, job.chat_id, CRAWL_STATUS_FINISHED, message_id=job.message_id
-    )
+    on_finish.assert_awaited_once_with(job, CRAWL_STATUS_FINISHED)
 
 
 @pytest.mark.asyncio
 async def test_process_job_fetch_failure() -> None:
     job = _job()
     sheets = _sheets()
-    bot = _bot()
+    on_finish = AsyncMock()
     request = httpx.Request("GET", job.url)
     response = httpx.Response(500, request=request)
 
@@ -93,25 +81,19 @@ async def test_process_job_fetch_failure() -> None:
                 "server error", request=request, response=response
             ),
         ),
-        patch(
-            "job_scraper.telegram_bot.reply_crawl_result",
-            new_callable=AsyncMock,
-        ) as reply,
     ):
-        await process_job(job, sheets, bot)
+        await process_job(job, sheets, on_finish)
 
     sheets.update_status.assert_called_once_with(job.job_id, CRAWL_STATUS_RUNNING)
     sheets.update_result.assert_called_once_with(job.job_id, CRAWL_STATUS_FAILED, {})
-    reply.assert_awaited_once_with(
-        bot, job.chat_id, CRAWL_STATUS_FAILED, message_id=job.message_id
-    )
+    on_finish.assert_awaited_once_with(job, CRAWL_STATUS_FAILED)
 
 
 @pytest.mark.asyncio
 async def test_process_job_no_parser() -> None:
     job = _job()
     sheets = _sheets()
-    bot = _bot()
+    on_finish = AsyncMock()
 
     with (
         patch("job_scraper.queue.get_parser", return_value=None),
@@ -119,16 +101,10 @@ async def test_process_job_no_parser() -> None:
             "job_scraper.queue.fetch_html",
             new_callable=AsyncMock,
         ) as fetch,
-        patch(
-            "job_scraper.telegram_bot.reply_crawl_result",
-            new_callable=AsyncMock,
-        ) as reply,
     ):
-        await process_job(job, sheets, bot)
+        await process_job(job, sheets, on_finish)
 
     fetch.assert_not_awaited()
     sheets.update_status.assert_called_once_with(job.job_id, CRAWL_STATUS_RUNNING)
     sheets.update_result.assert_called_once_with(job.job_id, CRAWL_STATUS_FAILED, {})
-    reply.assert_awaited_once_with(
-        bot, job.chat_id, CRAWL_STATUS_FAILED, message_id=job.message_id
-    )
+    on_finish.assert_awaited_once_with(job, CRAWL_STATUS_FAILED)
