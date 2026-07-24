@@ -1,0 +1,36 @@
+---
+description: Project identity, process model, main flow, and hard constraints
+alwaysApply: true
+---
+
+# Project architecture
+
+`telegram-job-ad-scrapper` listens to **one** Telegram group, detects allowlisted job-ad URLs, crawls them, and writes results to the Google Sheets worksheet named **`jobs`**.
+
+## Hard constraints
+
+- Downstream / human-facing sheets are **out of scope** — never reference them in code.
+- No external infra (no DB, no Redis). Google Sheets is the only external datastore.
+- Single Podman container. Inject secrets (Telegram token, Google service-account creds) via env/mounts — never hardcode.
+- Flat `src/job_scrapper/` layout. Do not add repository/service/interface layers unless something concretely needs them.
+- Ask before any decision not covered by project rules.
+
+## Process model
+
+- Single asyncio process: one listener task + one or more crawler worker tasks on an in-memory `asyncio.Queue`.
+- Crash recovery: on startup, re-enqueue `jobs` rows with `crawl_status` in (`pending`, `running`) before starting the listener.
+- State: local JSON (`/data/state.json`) stores at least the last `update_id`. Write after each processed batch, not per message.
+
+## Reconciliation (priority order)
+
+1. Resume from `update_id` in the local state file, if present and valid.
+2. If absent/corrupt: best-effort resume from `jobs` (`job_id`, `timestamp`).
+3. If both fail: ignore backlog; accept only new updates from that point forward.
+
+## Main flow
+
+1. Incoming group message → validate URL (well-formed + site allowlisted).
+2. Quick reply: accepted or rejected (brief why).
+3. If accepted: write `pending` row to `jobs`, enqueue for crawl.
+4. Worker sets `running`, crawls the single URL, writes result fields + `finished`/`failed`.
+5. On finish, send a result summary back to the group.

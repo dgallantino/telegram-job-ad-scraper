@@ -1,0 +1,23 @@
+---
+description: Google Sheets jobs worksheet columns, statuses, and write batching
+globs: **/sheets.py
+alwaysApply: false
+---
+
+# Google Sheets — `jobs` worksheet
+
+Target worksheet name: **`jobs`** (never call it "Sheet A"). Downstream sheets are out of scope.
+
+## Columns
+
+`job_id` (telegram `chat_id` + `msg_id`), `timestamp`, `url`, `crawl_status`, `job_title`, `job_description`, `job_location`, `job_company`, `job_salary`, `job_type`, `job_posted_date`.
+
+## `crawl_status` values
+
+`pending` | `running` | `finished` | `failed` | `rejected`
+
+## Write rules
+
+- Rejected/unsupported URLs still get a row with `crawl_status=rejected` — do not silently drop them after the chat reply.
+- Use `gspread` + `google-auth` (service account). No hand-rolled Sheets HTTP.
+- Batch and minimize writes — Sheets API has real rate limits; do not design around per-message synchronous writes.
