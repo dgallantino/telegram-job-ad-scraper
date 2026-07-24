@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from job_scrapper.config import Settings
-from job_scrapper.sheets import (
+from job_scraper.config import Settings
+from job_scraper.sheets import (
     CRAWL_STATUS_FAILED,
     CRAWL_STATUS_FINISHED,
     CRAWL_STATUS_PENDING,
@@ -59,10 +59,10 @@ def _make_client(
     credentials = MagicMock()
     with (
         patch(
-            "job_scrapper.sheets.Credentials.from_service_account_file",
+            "job_scraper.sheets.Credentials.from_service_account_file",
             return_value=credentials,
         ),
-        patch("job_scrapper.sheets.gspread.authorize", return_value=client),
+        patch("job_scraper.sheets.gspread.authorize", return_value=client),
     ):
         sheets = SheetsClient(_settings(tmp_path))
 

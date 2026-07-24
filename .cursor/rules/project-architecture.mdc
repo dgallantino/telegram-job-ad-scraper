@@ -12,12 +12,12 @@ alwaysApply: true
 - Downstream / human-facing sheets are **out of scope** — never reference them in code.
 - No external infra (no DB, no Redis). Google Sheets is the only external datastore.
 - Single Podman container. Inject secrets (Telegram token, Google service-account creds) via env/mounts — never hardcode.
-- Flat `src/job_scrapper/` layout. Do not add repository/service/interface layers unless something concretely needs them.
+- Flat `src/job_scraper/` layout. Do not add repository/service/interface layers unless something concretely needs them.
 - Ask before any decision not covered by project rules.
 
 ## Process model
 
-- Single asyncio process: one listener task + one or more crawler worker tasks on an in-memory `asyncio.Queue`.
+- Single asyncio process: one listener task + one or more scraper worker tasks on an in-memory `asyncio.Queue`.
 - Crash recovery: on startup, re-enqueue `jobs` rows with `crawl_status` in (`pending`, `running`) before starting the listener.
 - State: local JSON (`/data/state.json`) stores at least the last `update_id`. Write after each processed batch, not per message.
 

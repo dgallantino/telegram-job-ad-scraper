@@ -1,4 +1,4 @@
-"""Environment-variable loading and validation for the job scrapper.
+"""Environment-variable loading and validation for the job scraper.
 
 Reads configuration from the process environment (optionally populated from a
 local ``.env`` file via ``python-dotenv``) into a single immutable

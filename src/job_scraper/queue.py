@@ -4,7 +4,7 @@ One listener task (see ``telegram_bot.py``) produces ``Job`` items onto a
 single ``asyncio.Queue``. One or more worker tasks consume from it and hand
 each job to ``process_job`` for crawling. The queue/worker plumbing here is
 real; what a worker actually does with a job (``process_job``) is still a
-stub pending the crawler and Sheets implementations.
+stub pending the scraper and Sheets implementations.
 """
 
 from __future__ import annotations
@@ -38,11 +38,11 @@ def create_queue() -> asyncio.Queue[Job]:
 async def process_job(job: Job) -> None:
     """Handle a single crawl job: set running, crawl, write result, notify chat.
 
-    TODO: Implement once ``sheets.py`` and the real crawler dispatch/parsers
+    TODO: Implement once ``sheets.py`` and the real scraper dispatch/parsers
     are ready:
       1. Mark the Sheet A row for ``job.job_id`` as ``running``.
       2. Fetch ``job.url`` (httpx) and look up its parser via
-         ``crawler.dispatch.get_parser``.
+         ``scraper.dispatch.get_parser``.
       3. Parse the page into job fields; write them + ``finished``/``failed``
          to Sheet A.
       4. Send a result-summary message back to ``job.chat_id``.

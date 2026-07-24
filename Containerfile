@@ -12,4 +12,4 @@ VOLUME ["/data"]
 
 ENV STATE_FILE_PATH=/data/state.json
 
-ENTRYPOINT ["job-scrapper"]
+ENTRYPOINT ["job-scraper"]

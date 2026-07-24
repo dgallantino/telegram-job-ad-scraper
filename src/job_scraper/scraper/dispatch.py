@@ -1,17 +1,13 @@
 """URL validation and site-allowlist dispatch.
 
-Two independent checks happen before a URL is ever crawled:
+Two independent checks happen before a URL is ever scraped:
 
 1. Is it well-formed at all (``is_well_formed_url``)?
 2. Is its host in our small, explicit allowlist of supported job sites
    (``is_supported_site`` / ``get_parser``)?
 
-Only URLs that pass both are enqueued for crawling; everything else gets a
-``rejected`` row in Sheet A (handled by callers, not here).
-
-The concrete list of supported sites is TBD (see kickoff-prompt.md) — this
-module only implements the lookup mechanism. ``sites/example_site.py`` is a
-single placeholder registration showing the expected parser signature.
+Only URLs that pass both are enqueued for scraping; everything else gets a
+``rejected`` row in the ``jobs`` sheet (handled by callers, not here).
 """
 
 from __future__ import annotations
@@ -19,15 +15,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from urllib.parse import urlparse
 
-from job_scrapper.crawler.sites import example_site
+from job_scraper.scraper.sites import example_site, jobstreet
 
-ParserFunc = Callable[[str, str], dict]
+ParserFunc = Callable[[str], dict]
 
 # Hostname (lowercase, no leading "www.") -> parser function.
-# TODO: Replace with the real, decided site allowlist. Currently registers
-# only the placeholder parser for demonstration purposes.
 _SITE_ALLOWLIST: dict[str, ParserFunc] = {
     "example.com": example_site.parse,
+    "id.jobstreet.com": jobstreet.parse,
 }
 
 

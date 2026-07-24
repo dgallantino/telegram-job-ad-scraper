@@ -22,7 +22,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 from gspread.utils import rowcol_to_a1
 
-from job_scrapper.config import Settings
+from job_scraper.config import Settings
 
 CRAWL_STATUS_PENDING = "pending"
 CRAWL_STATUS_RUNNING = "running"

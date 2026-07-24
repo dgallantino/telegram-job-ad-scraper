@@ -14,11 +14,11 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from job_scrapper import queue as job_queue
-from job_scrapper import state as state_module
-from job_scrapper import telegram_bot
-from job_scrapper.config import ConfigError, Settings, load_settings
-from job_scrapper.sheets import SheetsClient
+from job_scraper import queue as job_queue
+from job_scraper import state as state_module
+from job_scraper import telegram_bot
+from job_scraper.config import ConfigError, Settings, load_settings
+from job_scraper.sheets import SheetsClient
 
 logger = logging.getLogger(__name__)
 

@@ -23,11 +23,11 @@ from datetime import datetime, timezone
 from telegram import Bot, Message, MessageEntity, Update
 from telegram.error import NetworkError, TelegramError, TimedOut
 
-from job_scrapper.config import Settings
-from job_scrapper.crawler.dispatch import is_supported_site, is_well_formed_url
-from job_scrapper.queue import Job
-from job_scrapper.sheets import SheetsClient
-from job_scrapper.state import State, save_state
+from job_scraper.config import Settings
+from job_scraper.scraper.dispatch import is_supported_site, is_well_formed_url
+from job_scraper.queue import Job
+from job_scraper.sheets import SheetsClient
+from job_scraper.state import State, save_state
 
 logger = logging.getLogger(__name__)
 
