@@ -23,36 +23,51 @@ class State(TypedDict, total=False):
 _DEFAULT_STATE: State = {"last_update_id": None}
 
 
-def load_state(path: str) -> State:
-    """Read the state file, tolerating a missing or corrupt file.
+class StateStore:
+    """Load and atomically persist the local JSON state file."""
 
-    Returns:
-        The parsed state dict, or a copy of the default state if the file
-        does not exist or cannot be parsed as valid JSON.
-    """
-    file_path = Path(path)
-    if not file_path.exists():
-        return dict(_DEFAULT_STATE)
+    def __init__(self, path: str) -> None:
+        self._path = Path(path)
+        self._data: State = dict(_DEFAULT_STATE)
 
-    try:
-        with file_path.open("r", encoding="utf-8") as f:
-            data: Any = json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return dict(_DEFAULT_STATE)
+    @property
+    def last_update_id(self) -> int | None:
+        return self._data.get("last_update_id")
 
-    if not isinstance(data, dict):
-        return dict(_DEFAULT_STATE)
+    @last_update_id.setter
+    def last_update_id(self, value: int | None) -> None:
+        self._data["last_update_id"] = value
 
-    return data
+    def load(self) -> StateStore:
+        """Read the state file into this store, tolerating missing/corrupt files.
 
+        Returns:
+            ``self``, for convenient chaining (e.g. ``StateStore(path).load()``).
+        """
+        if not self._path.exists():
+            self._data = dict(_DEFAULT_STATE)
+            return self
 
-def save_state(path: str, state: State) -> None:
-    """Atomically write the state file, creating parent directories as needed."""
-    file_path = Path(path)
-    file_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with self._path.open("r", encoding="utf-8") as f:
+                data: Any = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            self._data = dict(_DEFAULT_STATE)
+            return self
 
-    tmp_path = file_path.with_suffix(file_path.suffix + ".tmp")
-    with tmp_path.open("w", encoding="utf-8") as f:
-        json.dump(state, f, indent=2, sort_keys=True)
-        f.write("\n")
-    os.replace(tmp_path, file_path)
+        if not isinstance(data, dict):
+            self._data = dict(_DEFAULT_STATE)
+            return self
+
+        self._data = data
+        return self
+
+    def save(self) -> None:
+        """Atomically write the state file, creating parent directories as needed."""
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+
+        tmp_path = self._path.with_suffix(self._path.suffix + ".tmp")
+        with tmp_path.open("w", encoding="utf-8") as f:
+            json.dump(self._data, f, indent=2, sort_keys=True)
+            f.write("\n")
+        os.replace(tmp_path, self._path)

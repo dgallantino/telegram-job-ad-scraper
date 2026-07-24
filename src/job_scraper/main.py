@@ -15,10 +15,10 @@ import asyncio
 import logging
 
 from job_scraper import queue as job_queue
-from job_scraper import state as state_module
 from job_scraper import telegram_bot
 from job_scraper.config import ConfigError, Settings, load_settings
 from job_scraper.sheets import SheetsClient
+from job_scraper.state import StateStore
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ async def run() -> None:
     logging.getLogger("httpcore").setLevel(logging.WARNING)
 
     settings = load_settings()
-    state = state_module.load_state(settings.state_file_path)
+    state = StateStore(settings.state_file_path).load()
 
     queue = job_queue.create_queue()
     workers = job_queue.spawn_workers(queue, settings.worker_count)

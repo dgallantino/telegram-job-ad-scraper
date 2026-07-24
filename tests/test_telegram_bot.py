@@ -14,6 +14,7 @@ from telegram import Chat, Message, MessageEntity, Update, User
 
 from job_scraper.config import Settings
 from job_scraper.queue import Job
+from job_scraper.state import StateStore
 from job_scraper.telegram_bot import (
     _MSG_ACCEPTED,
     _MSG_CRAWL_FAILED,
@@ -97,11 +98,17 @@ def _update(update_id: int, message: Message) -> Update:
     return Update(update_id=update_id, message=message)
 
 
+def _state(tmp_path: Path, *, last_update_id: int | None = None) -> StateStore:
+    store = StateStore(str(tmp_path / "state.json"))
+    store.last_update_id = last_update_id
+    return store
+
+
 async def _drive_listener(
     bot: MagicMock,
     settings: Settings,
     queue: asyncio.Queue[Job],
-    state: dict[str, Any],
+    state: StateStore,
     sheets: FakeSheets,
     *,
     wait_until: Any,
@@ -217,7 +224,7 @@ async def test_health_command_replies_ok(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     sheets = FakeSheets()
     queue: asyncio.Queue[Job] = asyncio.Queue()
-    state: dict[str, Any] = {"last_update_id": None}
+    state = _state(tmp_path)
     msg = _message(text="/health", message_id=3)
     calls = {"n": 0}
 
@@ -258,7 +265,7 @@ async def test_wrong_chat_advances_state_without_side_effects(
     settings = _settings(tmp_path)
     sheets = FakeSheets()
     queue: asyncio.Queue[Job] = asyncio.Queue()
-    state: dict[str, Any] = {"last_update_id": None}
+    state = _state(tmp_path)
 
     url = "https://example.com/job"
     text = url
@@ -282,7 +289,7 @@ async def test_wrong_chat_advances_state_without_side_effects(
         queue,
         state,
         sheets,
-        wait_until=lambda: state.get("last_update_id") == 10,
+        wait_until=lambda: state.last_update_id == 10,
     )
 
     assert queue.empty()
@@ -297,7 +304,7 @@ async def test_no_url_message_silent_skip(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     sheets = FakeSheets()
     queue: asyncio.Queue[Job] = asyncio.Queue()
-    state: dict[str, Any] = {"last_update_id": None}
+    state = _state(tmp_path)
     msg = _message(text="just chatting")
     calls = {"n": 0}
 
@@ -318,7 +325,7 @@ async def test_no_url_message_silent_skip(tmp_path: Path) -> None:
         queue,
         state,
         sheets,
-        wait_until=lambda: state.get("last_update_id") == 11,
+        wait_until=lambda: state.last_update_id == 11,
     )
 
     assert queue.empty()
@@ -332,7 +339,7 @@ async def test_accepted_allowlisted_url(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     sheets = FakeSheets()
     queue: asyncio.Queue[Job] = asyncio.Queue()
-    state: dict[str, Any] = {"last_update_id": None}
+    state = _state(tmp_path)
 
     url = "https://example.com/job"
     text = f"apply {url}"
@@ -378,7 +385,7 @@ async def test_rejected_unsupported_site(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     sheets = FakeSheets()
     queue: asyncio.Queue[Job] = asyncio.Queue()
-    state: dict[str, Any] = {"last_update_id": None}
+    state = _state(tmp_path)
 
     url = "https://not-allowlisted.example/job"
     text = url
@@ -417,7 +424,7 @@ async def test_rejected_malformed_url(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     sheets = FakeSheets()
     queue: asyncio.Queue[Job] = asyncio.Queue()
-    state: dict[str, Any] = {"last_update_id": None}
+    state = _state(tmp_path)
 
     # TEXT_LINK can carry a non-http URL that fails well-formed check
     text = "click here"
@@ -458,7 +465,7 @@ async def test_multi_url_unique_job_ids(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     sheets = FakeSheets()
     queue: asyncio.Queue[Job] = asyncio.Queue()
-    state: dict[str, Any] = {"last_update_id": None}
+    state = _state(tmp_path)
 
     u1 = "https://example.com/a"
     u2 = "https://other.example/b"
@@ -502,7 +509,7 @@ async def test_offset_uses_last_update_id_plus_one(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     sheets = FakeSheets()
     queue: asyncio.Queue[Job] = asyncio.Queue()
-    state: dict[str, Any] = {"last_update_id": 50}
+    state = _state(tmp_path, last_update_id=50)
     seen_offsets: list[int | None] = []
 
     async def get_updates(**kwargs: Any) -> tuple[Update, ...]:

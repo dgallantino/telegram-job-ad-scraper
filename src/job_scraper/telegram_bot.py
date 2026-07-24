@@ -27,7 +27,7 @@ from job_scraper.config import Settings
 from job_scraper.scraper.dispatch import is_supported_site, is_well_formed_url
 from job_scraper.queue import Job
 from job_scraper.sheets import SheetsClient
-from job_scraper.state import State, save_state
+from job_scraper.state import StateStore
 
 logger = logging.getLogger(__name__)
 
@@ -207,7 +207,7 @@ async def run_listener(
     bot: Bot,
     settings: Settings,
     queue: asyncio.Queue[Job],
-    state: State,
+    state: StateStore,
     sheets: SheetsClient,
 ) -> None:
     """Long-poll for updates in the target group and drive validate/reply/enqueue."""
@@ -218,7 +218,7 @@ async def run_listener(
     )
 
     while True:
-        last_update_id = state.get("last_update_id")
+        last_update_id = state.last_update_id
         offset = None if last_update_id is None else last_update_id + 1
 
         try:
@@ -252,5 +252,5 @@ async def run_listener(
                     message.message_id,
                 )
 
-        state["last_update_id"] = max_update_id
-        save_state(settings.state_file_path, state)
+        state.last_update_id = max_update_id
+        state.save()
