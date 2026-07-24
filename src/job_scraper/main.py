@@ -44,13 +44,13 @@ async def run() -> None:
     settings = load_settings()
     state = StateStore(settings.state_file_path).load()
 
-    queue = job_queue.create_queue()
-    workers = job_queue.spawn_workers(queue, settings.worker_count)
-
-    await _reenqueue_incomplete_jobs(settings, queue)
-
     bot = telegram_bot.create_bot(settings)
     sheets = SheetsClient(settings)
+
+    queue = job_queue.create_queue()
+    workers = job_queue.spawn_workers(queue, settings.worker_count, sheets, bot)
+
+    await _reenqueue_incomplete_jobs(settings, queue)
     logger.info("starting Telegram listener with %d worker(s)", settings.worker_count)
 
     try:
