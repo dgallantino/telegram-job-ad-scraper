@@ -20,8 +20,19 @@ dependencies = [
     "python-dotenv>=1.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+]
+
 [project.scripts]
 job-scrapper = "job_scrapper.main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/job_scrapper"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["src"]
+testpaths = ["tests"]
