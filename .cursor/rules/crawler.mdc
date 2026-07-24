@@ -1,0 +1,23 @@
+---
+description: Crawler allowlist, no link-following, site parser shape
+globs: **/crawler/**/*.py
+alwaysApply: false
+---
+
+# Crawler
+
+## Allowlist
+
+- Support only an explicit, small allowlist of sites.
+- Route via `dispatch.py` (site → parser lookup). Do not scrape arbitrary hosts.
+
+## Fetch / parse rules
+
+- Crawl **only** the given URL. Never follow links found on the page.
+- Use `httpx` (async) + BeautifulSoup with `lxml`.
+
+## Site parsers (`crawler/sites/`)
+
+- One module per site.
+- Expected shape: input URL (and/or HTML) → job-fields dict matching `jobs` sheet columns (`job_title`, `job_description`, `job_location`, `job_company`, `job_salary`, `job_type`, `job_posted_date`, etc.).
+- Add new sites as new modules; register them in the dispatch allowlist.

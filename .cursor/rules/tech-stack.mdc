@@ -1,0 +1,21 @@
+---
+description: Locked tech stack — do not redesign or swap libraries
+alwaysApply: true
+---
+
+# Tech stack
+
+Use Python 3.11+. Do not redesign or substitute these libraries without asking.
+
+| Concern | Library | Notes |
+|---|---|---|
+| HTTP crawl | `httpx` (async) | |
+| HTML parse | `beautifulsoup4` + `lxml` | `lxml` is the parser backend |
+| Google Sheets | `gspread` + `google-auth` | Service-account auth; no raw Sheets HTTP |
+| Telegram | `python-telegram-bot` | **`Bot` class only** |
+
+## Telegram library rule
+
+- Use low-level `Bot` methods (`get_updates`, `send_message`, etc.).
+- Do **not** use `Application` / `ApplicationBuilder` or their polling/handler framework.
+- Drive our own asyncio loop and offset/state persistence. PTB is for typed API calls and built-in flood-control retries only.

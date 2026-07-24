@@ -74,7 +74,7 @@ telegram-job-ad-scrapper/
 
 ### Google Sheets — Sheet A columns
 
-`job_id` (Telegram `chat_id` + `msg_id`), `timestamp`, `url`, `crawl_status`
+`job_id` (string `{chat_id}_{message_id}`), `timestamp`, `url`, `crawl_status`
 (`pending`/`running`/`finished`/`failed`/`rejected`), `job_title`,
 `job_description`, `job_location`, `job_company`, `job_salary`, `job_type`,
 `job_posted_date`.

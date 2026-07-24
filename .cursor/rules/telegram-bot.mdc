@@ -1,0 +1,23 @@
+---
+description: Telegram listener conventions — Bot API, long poll, offset state
+globs: **/telegram_bot.py
+alwaysApply: false
+---
+
+# Telegram bot
+
+## Access model
+
+- Bot API only — not MTProto / user-account clients.
+- Long polling via `getUpdates`. Offset tracking = Telegram's `update_id`.
+- The bot must be added to the single target group; listen to that group only.
+
+## Implementation
+
+- Use `python-telegram-bot`'s `Bot` class only (see tech-stack rule).
+- Own asyncio loop + offset persistence; do not use `Application` / handlers.
+- Listener responsibilities: validate URLs, quick accept/reject reply, enqueue accepted jobs.
+
+## Known limitation (document in code comments when touching this)
+
+`getUpdates` only returns unacknowledged updates (Telegram buffers ~24h). It cannot fetch arbitrary chat history. State-file loss beyond that window is unrecoverable via this API — reconciliation can prevent reprocessing, but cannot recover missed messages older than the buffer.

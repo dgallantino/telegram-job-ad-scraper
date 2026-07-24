@@ -6,7 +6,7 @@ Startup order:
   2. Create the job queue and spawn worker tasks.
   3. Re-enqueue any Sheet A rows left ``pending``/``running`` from a previous
      crash (TODO — depends on ``sheets.py``).
-  4. Start the Telegram listener (TODO — depends on ``telegram_bot.py``).
+  4. Start the Telegram listener.
 """
 
 from __future__ import annotations
@@ -16,7 +16,9 @@ import logging
 
 from job_scrapper import queue as job_queue
 from job_scrapper import state as state_module
+from job_scrapper import telegram_bot
 from job_scrapper.config import ConfigError, Settings, load_settings
+from job_scrapper.sheets import SheetsClient
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,9 @@ async def _reenqueue_incomplete_jobs(
 async def run() -> None:
     """Build all components and run until cancelled (e.g. SIGINT/SIGTERM)."""
     logging.basicConfig(level=logging.INFO)
+    # PTB uses httpx; its INFO request lines include the bot token in the URL.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
     settings = load_settings()
     state = state_module.load_state(settings.state_file_path)
@@ -44,16 +49,12 @@ async def run() -> None:
 
     await _reenqueue_incomplete_jobs(settings, queue)
 
-    # TODO: Start the Telegram listener from telegram_bot.py, e.g.:
-    #   bot = telegram.Bot(token=settings.telegram_bot_token)
-    #   await telegram_bot.run_listener(bot, settings, queue, state)
-    logger.info(
-        "Scaffold ready: %d worker(s) started, listener not yet implemented.",
-        settings.worker_count,
-    )
+    bot = telegram_bot.create_bot(settings)
+    sheets = SheetsClient(settings)
+    logger.info("starting Telegram listener with %d worker(s)", settings.worker_count)
 
     try:
-        await asyncio.Event().wait()  # placeholder: block until cancelled
+        await telegram_bot.run_listener(bot, settings, queue, state, sheets)
     finally:
         await job_queue.shutdown_workers(workers)
 
