@@ -34,8 +34,8 @@ logger = logging.getLogger(__name__)
 _URL_ENTITY_TYPES = [MessageEntity.URL, MessageEntity.TEXT_LINK]
 
 _MSG_ACCEPTED = "Accepted — queued for crawl."
-_MSG_CRAWL_FINISHED = "Crawl finished (stub)."
-_MSG_CRAWL_FAILED = "Crawl failed (stub)."
+_MSG_CRAWL_FINISHED = "Scrape finished"
+_MSG_CRAWL_FAILED = "Scrape failed"
 _MSG_HEALTH_OK = "ok"
 
 _REASON_NOT_VALID = "not a valid URL"
@@ -118,6 +118,11 @@ async def reply_crawl_result(
     )
 
 
+async def on_crawl_finish(bot: Bot, job: Job, status: str) -> None:
+    """Queue ``on_finish`` helper: reply with crawl status for ``job``."""
+    await reply_crawl_result(bot, job.chat_id, status, message_id=job.message_id)
+
+
 async def reply_health(
     bot: Bot,
     chat_id: int | str,
@@ -146,6 +151,38 @@ def _job_id(chat_id: str, message_id: int, index: int, total: int) -> str:
     if total == 1:
         return f"{chat_id}_{message_id}"
     return f"{chat_id}_{message_id}_{index}"
+
+
+def parse_job_id(job_id: str) -> tuple[str, int]:
+    """Parse ``{chat_id}_{message_id}`` or ``{chat_id}_{message_id}_{index}``.
+
+    Returns ``(chat_id, message_id)``. The optional trailing index is ignored.
+
+    Raises:
+        ValueError: If ``job_id`` is empty or does not match a known format.
+    """
+    if not job_id:
+        raise ValueError("job_id is empty")
+
+    # Multi-URL form first so a trailing index is not treated as message_id.
+    parts = job_id.rsplit("_", 2)
+    if len(parts) == 3:
+        chat_id, message_id_str, index_str = parts
+        if chat_id and message_id_str.isdigit() and index_str.isdigit():
+            message_id = int(message_id_str)
+            if message_id > 0:
+                return chat_id, message_id
+
+    parts = job_id.rsplit("_", 1)
+    if len(parts) != 2:
+        raise ValueError(f"invalid job_id: {job_id!r}")
+    chat_id, message_id_str = parts
+    if not chat_id or not message_id_str.isdigit():
+        raise ValueError(f"invalid job_id: {job_id!r}")
+    message_id = int(message_id_str)
+    if message_id <= 0:
+        raise ValueError(f"invalid job_id: {job_id!r}")
+    return chat_id, message_id
 
 
 def _utc_timestamp() -> str:

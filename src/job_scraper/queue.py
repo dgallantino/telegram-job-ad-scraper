@@ -2,18 +2,30 @@
 
 One listener task (see ``telegram_bot.py``) produces ``Job`` items onto a
 single ``asyncio.Queue``. One or more worker tasks consume from it and hand
-each job to ``process_job`` for crawling. The queue/worker plumbing here is
-real; what a worker actually does with a job (``process_job``) is still a
-stub pending the scraper and Sheets implementations.
+each job to ``process_job`` for crawling and sheet updates. Chat notify is
+left to an ``on_finish`` callback supplied by the caller.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import Any
+
+from job_scraper.scraper.dispatch import get_parser
+from job_scraper.scraper.fetch import fetch_html
+from job_scraper.sheets import (
+    CRAWL_STATUS_FAILED,
+    CRAWL_STATUS_FINISHED,
+    CRAWL_STATUS_RUNNING,
+    SheetsClient,
+)
 
 logger = logging.getLogger(__name__)
+
+OnFinish = Callable[["Job", str], Awaitable[None]]
 
 
 @dataclass(frozen=True)
@@ -35,29 +47,46 @@ def create_queue() -> asyncio.Queue[Job]:
     return asyncio.Queue()
 
 
-async def process_job(job: Job) -> None:
-    """Handle a single crawl job: set running, crawl, write result, notify chat.
+async def process_job(job: Job, sheets: SheetsClient, on_finish: OnFinish) -> None:
+    """Handle a single crawl job: set running, crawl, write result, then notify.
 
-    TODO: Implement once ``sheets.py`` and the real scraper dispatch/parsers
-    are ready:
-      1. Mark the Sheet A row for ``job.job_id`` as ``running``.
-      2. Fetch ``job.url`` (httpx) and look up its parser via
-         ``scraper.dispatch.get_parser``.
-      3. Parse the page into job fields; write them + ``finished``/``failed``
-         to Sheet A.
-      4. Send a result-summary message back to ``job.chat_id``.
+    1. Mark the jobs row for ``job.job_id`` as ``running``.
+    2. Fetch ``job.url`` and look up its parser via ``get_parser``.
+    3. Parse the page into job fields; write them + ``finished``/``failed``.
+    4. Invoke ``on_finish(job, status)`` so the caller can reply to chat.
     """
-    raise NotImplementedError("process_job is not yet implemented")
+    sheets.update_status(job.job_id, CRAWL_STATUS_RUNNING)
+
+    status = CRAWL_STATUS_FAILED
+    fields: dict[str, Any] = {}
+    try:
+        parser = get_parser(job.url)
+        if parser is None:
+            raise RuntimeError(f"no parser registered for {job.url!r}")
+        html = await fetch_html(job.url)
+        fields = parser(html)
+        status = CRAWL_STATUS_FINISHED
+    except Exception:  # noqa: BLE001 - record failed status; do not kill worker
+        logger.exception("crawl failed for job %s", job.job_id)
+
+    sheets.update_result(job.job_id, status, fields)
+    logger.info("crawl %s for job %s url=%s", status, job.job_id, job.url)
+    await on_finish(job, status)
 
 
-async def _worker_loop(worker_id: int, queue: asyncio.Queue[Job]) -> None:
+async def _worker_loop(
+    worker_id: int,
+    queue: asyncio.Queue[Job],
+    sheets: SheetsClient,
+    on_finish: OnFinish,
+) -> None:
     """Continuously pull jobs off ``queue`` and process them until cancelled."""
     logger.info("worker %d started", worker_id)
     try:
         while True:
             job = await queue.get()
             try:
-                await process_job(job)
+                await process_job(job, sheets, on_finish)
             except Exception:  # noqa: BLE001 - worker must not die on a bad job
                 logger.exception("worker %d failed processing job %s", worker_id, job.job_id)
             finally:
@@ -67,10 +96,18 @@ async def _worker_loop(worker_id: int, queue: asyncio.Queue[Job]) -> None:
         raise
 
 
-def spawn_workers(queue: asyncio.Queue[Job], worker_count: int) -> list[asyncio.Task[None]]:
+def spawn_workers(
+    queue: asyncio.Queue[Job],
+    worker_count: int,
+    sheets: SheetsClient,
+    on_finish: OnFinish,
+) -> list[asyncio.Task[None]]:
     """Start ``worker_count`` worker tasks consuming from ``queue``."""
     return [
-        asyncio.create_task(_worker_loop(i, queue), name=f"worker-{i}")
+        asyncio.create_task(
+            _worker_loop(i, queue, sheets, on_finish),
+            name=f"worker-{i}",
+        )
         for i in range(worker_count)
     ]
 
