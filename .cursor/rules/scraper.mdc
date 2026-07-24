@@ -20,4 +20,4 @@ alwaysApply: false
 
 - One module per site.
 - Expected shape: HTML → job-fields dict matching `jobs` sheet columns (`job_title`, `job_description`, `job_location`, `job_company`, `job_salary`, `job_type`, `job_posted_date`, etc.).
-- Add new sites as new modules; register them in the dispatch allowlist.
+- Each module exports `SITE_HOST` (hostname, lowercase, no `www.`) and `parse`; `sites/__init__.py` auto-registers them into `SITE_ALLOWLIST`. No manual dispatch edit.

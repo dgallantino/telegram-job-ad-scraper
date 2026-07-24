@@ -4,11 +4,13 @@ This is a stub demonstrating the expected parser function signature that
 every real site module must implement: take raw HTML and return a dict of
 ``jobs`` sheet job fields. It performs no real parsing.
 
-Real site modules should register themselves in
-``job_scraper.scraper.dispatch._SITE_ALLOWLIST``.
+Declare ``SITE_HOST`` and ``parse``; ``sites/__init__.py`` auto-registers
+the module into ``SITE_ALLOWLIST``.
 """
 
 from __future__ import annotations
+
+SITE_HOST = "example.com"
 
 
 def parse(html: str) -> dict:

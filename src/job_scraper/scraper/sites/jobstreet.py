@@ -13,6 +13,8 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
+SITE_HOST = "id.jobstreet.com"
+
 _WINDOW_ASSIGN_RE = re.compile(
     r"window\.(?P<name>[A-Za-z0-9_]+)\s*=\s*",
 )
