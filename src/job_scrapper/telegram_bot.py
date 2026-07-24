@@ -18,14 +18,28 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 
-from telegram import Bot
+from telegram import Bot, Message, MessageEntity, Update
+from telegram.error import NetworkError, TelegramError, TimedOut
 
 from job_scrapper.config import Settings
+from job_scrapper.crawler.dispatch import is_supported_site, is_well_formed_url
 from job_scrapper.queue import Job
-from job_scrapper.state import State
+from job_scrapper.sheets import SheetsClient
+from job_scrapper.state import State, save_state
 
 logger = logging.getLogger(__name__)
+
+_URL_ENTITY_TYPES = [MessageEntity.URL, MessageEntity.TEXT_LINK]
+
+_MSG_ACCEPTED = "Accepted — queued for crawl."
+_MSG_CRAWL_FINISHED = "Crawl finished (stub)."
+_MSG_CRAWL_FAILED = "Crawl failed (stub)."
+_MSG_HEALTH_OK = "ok"
+
+_REASON_NOT_VALID = "not a valid URL"
+_REASON_UNSUPPORTED = "unsupported site"
 
 
 def create_bot(settings: Settings) -> Bot:
@@ -33,27 +47,210 @@ def create_bot(settings: Settings) -> Bot:
     return Bot(token=settings.telegram_bot_token)
 
 
+def extract_urls(message: Message) -> list[str]:
+    """Return unique http(s) candidate strings from URL / TEXT_LINK entities.
+
+    Preserves first-seen order. Looks at both message text and caption.
+    For ``TEXT_LINK``, uses ``entity.url``; for ``URL``, uses the entity text.
+    """
+    urls: list[str] = []
+    seen: set[str] = set()
+
+    def _add(parsed: dict[MessageEntity, str]) -> None:
+        for entity, value in parsed.items():
+            if entity.type == MessageEntity.TEXT_LINK:
+                url = entity.url or ""
+            else:
+                url = value
+            if url and url not in seen:
+                seen.add(url)
+                urls.append(url)
+
+    if message.text:
+        _add(message.parse_entities(types=_URL_ENTITY_TYPES))
+    if message.caption:
+        _add(message.parse_caption_entities(types=_URL_ENTITY_TYPES))
+    return urls
+
+
+async def reply_accepted(
+    bot: Bot,
+    chat_id: int | str,
+    *,
+    message_id: int | None = None,
+) -> None:
+    """Send a hardcoded accept acknowledgment (optionally as a reply)."""
+    await bot.send_message(
+        chat_id=chat_id,
+        text=_MSG_ACCEPTED,
+        reply_to_message_id=message_id,
+    )
+
+
+async def reply_rejected(
+    bot: Bot,
+    chat_id: int | str,
+    reason: str,
+    *,
+    message_id: int | None = None,
+) -> None:
+    """Send a reject acknowledgment including ``reason`` (optionally as a reply)."""
+    await bot.send_message(
+        chat_id=chat_id,
+        text=f"Rejected: {reason}",
+        reply_to_message_id=message_id,
+    )
+
+
+async def reply_crawl_result(
+    bot: Bot,
+    chat_id: int | str,
+    status: str,
+    *,
+    message_id: int | None = None,
+) -> None:
+    """Send a hardcoded crawl-result stub for workers (finished vs failed)."""
+    text = _MSG_CRAWL_FINISHED if status == "finished" else _MSG_CRAWL_FAILED
+    await bot.send_message(
+        chat_id=chat_id,
+        text=text,
+        reply_to_message_id=message_id,
+    )
+
+
+async def reply_health(
+    bot: Bot,
+    chat_id: int | str,
+    *,
+    message_id: int | None = None,
+) -> None:
+    """Reply to a ``/health`` smoke-test command with a fixed ok status."""
+    await bot.send_message(
+        chat_id=chat_id,
+        text=_MSG_HEALTH_OK,
+        reply_to_message_id=message_id,
+    )
+
+
+def _is_health_command(message: Message) -> bool:
+    """True when the message is ``/health`` or ``/health@BotName``."""
+    text = (message.text or "").strip()
+    if not text.startswith("/"):
+        return False
+    command = text.split(maxsplit=1)[0]
+    command = command.split("@", 1)[0].lower()
+    return command == "/health"
+
+
+def _job_id(chat_id: str, message_id: int, index: int, total: int) -> str:
+    if total == 1:
+        return f"{chat_id}_{message_id}"
+    return f"{chat_id}_{message_id}_{index}"
+
+
+def _utc_timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+async def _handle_message(
+    bot: Bot,
+    settings: Settings,
+    queue: asyncio.Queue[Job],
+    sheets: SheetsClient,
+    message: Message,
+) -> None:
+    chat_id = str(message.chat.id)
+    if chat_id != settings.telegram_chat_id:
+        return
+
+    logger.debug(f"message: {message}")
+    if _is_health_command(message):
+        await reply_health(bot, chat_id, message_id=message.message_id)
+        return
+
+    urls = extract_urls(message)
+    if not urls:
+        return
+
+    message_id = message.message_id
+    total = len(urls)
+    timestamp = _utc_timestamp()
+
+    for index, url in enumerate(urls):
+        job_id = _job_id(chat_id, message_id, index, total)
+
+        if not is_well_formed_url(url):
+            reason = _REASON_NOT_VALID
+            await reply_rejected(bot, chat_id, reason, message_id=message_id)
+            sheets.append_rejected_row(job_id, timestamp, url, reason)
+            continue
+
+        if not is_supported_site(url):
+            reason = _REASON_UNSUPPORTED
+            await reply_rejected(bot, chat_id, reason, message_id=message_id)
+            sheets.append_rejected_row(job_id, timestamp, url, reason)
+            continue
+
+        await reply_accepted(bot, chat_id, message_id=message_id)
+        sheets.append_pending_row(job_id, timestamp, url)
+        await queue.put(
+            Job(
+                job_id=job_id,
+                url=url,
+                chat_id=chat_id,
+                message_id=message_id,
+            )
+        )
+
+
 async def run_listener(
     bot: Bot,
     settings: Settings,
     queue: asyncio.Queue[Job],
     state: State,
+    sheets: SheetsClient,
 ) -> None:
-    """Long-poll for updates in the target group and drive validate/reply/enqueue.
+    """Long-poll for updates in the target group and drive validate/reply/enqueue."""
+    logger.info(
+        "listener started for chat_id=%s poll_timeout=%s",
+        settings.telegram_chat_id,
+        settings.telegram_poll_timeout,
+    )
 
-    TODO: Implement the real loop:
-      1. Call ``bot.get_updates(offset=state["last_update_id"] + 1, ...)``
-         with ``settings.telegram_poll_timeout``, restricted to
-         ``settings.telegram_chat_id``.
-      2. For each update's message, extract candidate URL(s).
-      3. Validate via ``crawler.dispatch.is_well_formed_url`` and
-         ``is_supported_site``.
-      4. Reply in chat: accepted or rejected (briefly stating why).
-      5. If accepted: write a ``pending`` row via ``sheets.SheetsClient`` and
-         put a ``Job`` on ``queue``. If rejected: write a ``rejected`` row
-         for audit (never silently drop).
-      6. After processing a batch of updates, update
-         ``state["last_update_id"]`` and persist via
-         ``job_scrapper.state.save_state`` (batched, not per message).
-    """
-    raise NotImplementedError("run_listener is not yet implemented")
+    while True:
+        last_update_id = state.get("last_update_id")
+        offset = None if last_update_id is None else last_update_id + 1
+
+        try:
+            updates: tuple[Update, ...] = await bot.get_updates(
+                offset=offset,
+                timeout=settings.telegram_poll_timeout,
+                allowed_updates=["message"],
+            )
+        except (TimedOut, NetworkError) as exc:
+            logger.warning("get_updates transient error: %s", exc)
+            continue
+        except TelegramError:
+            logger.exception("get_updates Telegram error")
+            continue
+
+        if not updates:
+            continue
+
+        max_update_id = max(u.update_id for u in updates)
+
+        for update in updates:
+            message = update.message
+            if message is None:
+                continue
+            try:
+                await _handle_message(bot, settings, queue, sheets, message)
+            except Exception:  # noqa: BLE001 - one bad message must not kill the loop
+                logger.exception(
+                    "failed handling update_id=%s message_id=%s",
+                    update.update_id,
+                    message.message_id,
+                )
+
+        state["last_update_id"] = max_update_id
+        save_state(settings.state_file_path, state)
