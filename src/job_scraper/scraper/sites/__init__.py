@@ -30,9 +30,9 @@ class JobFields:
 
 ParserFunc = Callable[[str], JobFields]
 
-__all__ = ["SITE_ALLOWLIST", "ParserFunc", "JobFields"]
 
 SITE_ALLOWLIST: dict[str, ParserFunc] = {}
+
 
 for _info in pkgutil.iter_modules(__path__, __name__ + "."):
     _module = importlib.import_module(_info.name)
@@ -40,3 +40,6 @@ for _info in pkgutil.iter_modules(__path__, __name__ + "."):
     _parse = getattr(_module, "parse", None)
     if isinstance(_host, str) and callable(_parse):
         SITE_ALLOWLIST[_host.lower().removeprefix("www.")] = _parse
+
+
+__all__ = ["SITE_ALLOWLIST", "ParserFunc", "JobFields"]
