@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 
 from job_scraper.queue import Job, process_job
+from job_scraper.scraper.sites import JobFields
 from job_scraper.sheets import (
     CRAWL_STATUS_FAILED,
     CRAWL_STATUS_FINISHED,
@@ -33,15 +35,15 @@ async def test_process_job_finished() -> None:
     job = _job()
     sheets = _sheets()
     on_finish = AsyncMock()
-    fields = {
-        "job_title": "Engineer",
-        "job_description": "Build things",
-        "job_location": "Jakarta",
-        "job_company": "Acme",
-        "job_salary": None,
-        "job_type": "Full time",
-        "job_posted_date": "2026-01-01",
-    }
+    fields = JobFields(
+        job_description="Build things",
+        job_title="Engineer",
+        job_location="Jakarta",
+        job_company="Acme",
+        job_salary=None,
+        job_type="Full time",
+        job_posted_date="2026-01-01",
+    )
     parser = MagicMock(return_value=fields)
 
     with (
@@ -59,7 +61,7 @@ async def test_process_job_finished() -> None:
     fetch.assert_awaited_once_with(job.url)
     parser.assert_called_once_with("<html/>")
     sheets.update_result.assert_called_once_with(
-        job.job_id, CRAWL_STATUS_FINISHED, fields
+        job.job_id, CRAWL_STATUS_FINISHED, asdict(fields)
     )
     on_finish.assert_awaited_once_with(job, CRAWL_STATUS_FINISHED)
 

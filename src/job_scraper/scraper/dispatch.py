@@ -15,15 +15,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from urllib.parse import urlparse
 
-from job_scraper.scraper.sites import example_site, jobstreet
+from job_scraper.scraper.sites import SITE_ALLOWLIST, ParserFunc
 
-ParserFunc = Callable[[str], dict]
-
-# Hostname (lowercase, no leading "www.") -> parser function.
-_SITE_ALLOWLIST: dict[str, ParserFunc] = {
-    "example.com": example_site.parse,
-    "id.jobstreet.com": jobstreet.parse,
-}
 
 
 def is_well_formed_url(url: str) -> bool:
@@ -45,9 +38,9 @@ def _normalize_host(url: str) -> str:
 
 def is_supported_site(url: str) -> bool:
     """Return True if ``url``'s host is in the supported-site allowlist."""
-    return _normalize_host(url) in _SITE_ALLOWLIST
+    return _normalize_host(url) in SITE_ALLOWLIST
 
 
 def get_parser(url: str) -> ParserFunc | None:
     """Look up the parser function registered for ``url``'s host, if any."""
-    return _SITE_ALLOWLIST.get(_normalize_host(url))
+    return SITE_ALLOWLIST.get(_normalize_host(url))

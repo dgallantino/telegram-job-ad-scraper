@@ -9,6 +9,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from job_scraper.config import Settings
+from gspread.utils import ValidationConditionType
+
 from job_scraper.sheets import (
     CRAWL_STATUS_FAILED,
     CRAWL_STATUS_FINISHED,
@@ -84,9 +86,17 @@ def test_ensure_header_rewrites_when_mismatched(tmp_path: Path) -> None:
     worksheet.update.assert_called_once_with([list(SHEET_A_COLUMNS)], "A1", raw=False)
 
 
+def test_checkbox_not_applied_on_connect(tmp_path: Path) -> None:
+    _, worksheet = _make_client(tmp_path, header=list(SHEET_A_COLUMNS))
+    worksheet.add_validation.assert_not_called()
+
+
 def test_append_pending_row(tmp_path: Path) -> None:
     sheets, worksheet = _make_client(tmp_path)
     worksheet.reset_mock()
+    worksheet.append_row.return_value = {
+        "updates": {"updatedRange": "jobs!A2:L2"},
+    }
 
     sheets.append_pending_row("-100_1", "2026-01-01T00:00:00Z", "https://example.com/j")
 
@@ -97,12 +107,22 @@ def test_append_pending_row(tmp_path: Path) -> None:
     assert row[2] == "https://example.com/j"
     assert row[3] == CRAWL_STATUS_PENDING
     assert len(row) == len(SHEET_A_COLUMNS)
-    assert all(cell == "" for cell in row[4:])
+    assert all(cell == "" for cell in row[4:-1])
+    assert row[-1] is False
+    worksheet.add_validation.assert_called_once_with(
+        "L2",
+        ValidationConditionType.boolean,
+        [],
+        showCustomUi=True,
+    )
 
 
 def test_append_rejected_row_ignores_reason(tmp_path: Path) -> None:
     sheets, worksheet = _make_client(tmp_path)
     worksheet.reset_mock()
+    worksheet.append_row.return_value = {
+        "updates": {"updatedRange": "jobs!A3:L3"},
+    }
 
     sheets.append_rejected_row(
         "-100_2",
@@ -115,6 +135,13 @@ def test_append_rejected_row_ignores_reason(tmp_path: Path) -> None:
     assert row[3] == CRAWL_STATUS_REJECTED
     assert "unsupported site" not in row
     assert len(row) == len(SHEET_A_COLUMNS)
+    assert row[-1] is False
+    worksheet.add_validation.assert_called_once_with(
+        "L3",
+        ValidationConditionType.boolean,
+        [],
+        showCustomUi=True,
+    )
 
 
 def test_update_status(tmp_path: Path) -> None:
@@ -159,6 +186,7 @@ def test_update_result_batch_and_ignores_unknown(tmp_path: Path) -> None:
             "job_company": "Acme",
             "unknown_field": "nope",
             "url": "should-ignore",
+            "send_to_job_track": True,
         },
     )
 
@@ -170,6 +198,7 @@ def test_update_result_batch_and_ignores_unknown(tmp_path: Path) -> None:
     assert ranges["H2"] == "Acme"  # job_company
     assert "unknown_field" not in str(updates)
     assert "should-ignore" not in str(updates)
+    assert "L2" not in ranges  # send_to_job_track never written
     assert worksheet.batch_update.call_args.kwargs.get("raw") is False
 
 

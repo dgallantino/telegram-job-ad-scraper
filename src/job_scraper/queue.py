@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from job_scraper.scraper.dispatch import get_parser
@@ -64,7 +64,7 @@ async def process_job(job: Job, sheets: SheetsClient, on_finish: OnFinish) -> No
         if parser is None:
             raise RuntimeError(f"no parser registered for {job.url!r}")
         html = await fetch_html(job.url)
-        fields = parser(html)
+        fields = asdict(parser(html))
         status = CRAWL_STATUS_FINISHED
     except Exception:  # noqa: BLE001 - record failed status; do not kill worker
         logger.exception("crawl failed for job %s", job.job_id)

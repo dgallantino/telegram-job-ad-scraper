@@ -3,7 +3,8 @@
 Columns: ``job_id`` (string ``{chat_id}_{message_id}``), ``timestamp``,
 ``url``, ``crawl_status`` (``pending``/``running``/``finished``/``failed``/
 ``rejected``), ``job_title``, ``job_description``, ``job_location``,
-``job_company``, ``job_salary``, ``job_type``, ``job_posted_date``.
+``job_company``, ``job_salary``, ``job_type``, ``job_posted_date``,
+``send_to_job_track`` (checkbox; bot writes unchecked only).
 
 Each public method uses a single gspread write/read call where practical
 (Sheets API rate limits). Callers still invoke methods per message — there
@@ -20,7 +21,12 @@ from typing import Any
 
 import gspread
 from google.oauth2.service_account import Credentials
-from gspread.utils import rowcol_to_a1
+from gspread.utils import (
+    ValidationConditionType,
+    a1_to_rowcol,
+    get_a1_from_absolute_range,
+    rowcol_to_a1,
+)
 
 from job_scraper.config import Settings
 
@@ -42,6 +48,7 @@ SHEET_A_COLUMNS = (
     "job_salary",
     "job_type",
     "job_posted_date",
+    "send_to_job_track",
 )
 
 _SCOPES = (
@@ -50,11 +57,14 @@ _SCOPES = (
 )
 
 _JOB_FIELD_COLUMNS = frozenset(
-    name for name in SHEET_A_COLUMNS if name.startswith("job_")
+    name
+    for name in SHEET_A_COLUMNS
+    if name.startswith("job_") and name != "job_id"
 )
 
 _COL_JOB_ID = SHEET_A_COLUMNS.index("job_id") + 1
 _COL_CRAWL_STATUS = SHEET_A_COLUMNS.index("crawl_status") + 1
+_COL_SEND_TO_JOB_TRACK = SHEET_A_COLUMNS.index("send_to_job_track") + 1
 
 
 class JobNotFoundError(LookupError):
@@ -88,13 +98,43 @@ class SheetsClient:
             return
         self._worksheet.update([expected], "A1", raw=False)
 
+    def _apply_checkbox(self, row: int) -> None:
+        """Apply BOOLEAN checkbox validation on ``send_to_job_track`` for ``row``."""
+        cell = rowcol_to_a1(row, _COL_SEND_TO_JOB_TRACK)
+        self._worksheet.add_validation(
+            cell,
+            ValidationConditionType.boolean,
+            [],
+            showCustomUi=True,
+        )
+
+    def _append_row(self, values: list[Any]) -> None:
+        """Append a data row and mark its ``send_to_job_track`` cell as a checkbox."""
+        result = self._worksheet.append_row(
+            values,
+            value_input_option="USER_ENTERED",
+        )
+        updated_range = (result or {}).get("updates", {}).get("updatedRange")
+        if not updated_range:
+            return
+        start_a1 = get_a1_from_absolute_range(updated_range).split(":", 1)[0]
+        row, _ = a1_to_rowcol(start_a1)
+        self._apply_checkbox(row)
+
     def _empty_job_fields(self) -> list[str]:
-        return [""] * (len(SHEET_A_COLUMNS) - 4)
+        return [""] * len(_JOB_FIELD_COLUMNS)
 
     def _build_row(
         self, job_id: str, timestamp: str, url: str, crawl_status: str
-    ) -> list[str]:
-        return [job_id, timestamp, url, crawl_status, *self._empty_job_fields()]
+    ) -> list[Any]:
+        return [
+            job_id,
+            timestamp,
+            url,
+            crawl_status,
+            *self._empty_job_fields(),
+            False,
+        ]
 
     def _find_row_number(self, job_id: str) -> int:
         """Return 1-based row index for ``job_id``, or raise ``JobNotFoundError``."""
@@ -109,9 +149,8 @@ class SheetsClient:
 
     def append_pending_row(self, job_id: str, timestamp: str, url: str) -> None:
         """Append a new row with ``crawl_status = pending`` for an accepted URL."""
-        self._worksheet.append_row(
-            self._build_row(job_id, timestamp, url, CRAWL_STATUS_PENDING),
-            value_input_option="USER_ENTERED",
+        self._append_row(
+            self._build_row(job_id, timestamp, url, CRAWL_STATUS_PENDING)
         )
 
     def append_rejected_row(
@@ -124,9 +163,8 @@ class SheetsClient:
         API but is intentionally not persisted (no column for it).
         """
         del reason  # kept for API compatibility; not written to the sheet
-        self._worksheet.append_row(
-            self._build_row(job_id, timestamp, url, CRAWL_STATUS_REJECTED),
-            value_input_option="USER_ENTERED",
+        self._append_row(
+            self._build_row(job_id, timestamp, url, CRAWL_STATUS_REJECTED)
         )
 
     def update_status(self, job_id: str, crawl_status: str) -> None:
@@ -148,7 +186,7 @@ class SheetsClient:
             job_id: The row to update.
             crawl_status: ``finished`` or ``failed``.
             fields: A subset of the ``job_*`` columns from ``SHEET_A_COLUMNS``.
-                Unknown keys are ignored.
+                Unknown keys are ignored. ``send_to_job_track`` is never written.
 
         Raises:
             JobNotFoundError: If no row with ``job_id`` exists.

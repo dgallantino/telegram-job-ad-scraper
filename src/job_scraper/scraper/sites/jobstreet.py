@@ -13,6 +13,10 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
+from job_scraper.scraper.sites import JobFields
+
+SITE_HOST = "id.jobstreet.com"
+
 _WINDOW_ASSIGN_RE = re.compile(
     r"window\.(?P<name>[A-Za-z0-9_]+)\s*=\s*",
 )
@@ -108,11 +112,14 @@ def _salary_value(salary: Any) -> str | None:
     return str(salary) if salary else None
 
 
-def parse(html: str) -> dict:
-    """Parse an id.jobstreet.com job-detail page into ``jobs`` sheet fields.
+def parse(html: str) -> JobFields:
+    """Parse an id.jobstreet.com job-detail page into ``JobFields``.
 
     Args:
         html: The raw HTML body of the scraped job-detail page.
+
+    Raises:
+        ValueError: If the job description node is missing or empty.
     """
     soup = BeautifulSoup(html, "lxml")
 
@@ -121,6 +128,8 @@ def parse(html: str) -> dict:
     job_location = _automation_text(soup, "job-detail-location")
     job_type = _automation_text(soup, "job-detail-work-type")
     job_description = _automation_text(soup, "jobAdDetails")
+    if job_description is None:
+        raise ValueError("missing job description (data-automation=jobAdDetails)")
 
     job_posted_date: str | None = None
     job_salary: str | None = None
@@ -136,13 +145,13 @@ def parse(html: str) -> dict:
                     job_posted_date = dt
             job_salary = _salary_value(job.get("salary"))
 
-    return {
-        "job_title": job_title,
-        "job_description": job_description,
-        "job_location": job_location,
-        "job_company": job_company,
-        "job_salary": job_salary,
-        "job_type": job_type,
-        "job_posted_date": job_posted_date,
-    }
+    return JobFields(
+        job_description=job_description,
+        job_title=job_title,
+        job_location=job_location,
+        job_company=job_company,
+        job_salary=job_salary,
+        job_type=job_type,
+        job_posted_date=job_posted_date,
+    )
 

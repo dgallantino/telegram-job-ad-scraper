@@ -10,7 +10,7 @@ Target worksheet name: **`jobs`** (never call it "Sheet A"). Downstream sheets a
 
 ## Columns
 
-`job_id` (string `{chat_id}_{message_id}`), `timestamp`, `url`, `crawl_status`, `job_title`, `job_description`, `job_location`, `job_company`, `job_salary`, `job_type`, `job_posted_date`.
+`job_id` (string `{chat_id}_{message_id}`), `timestamp`, `url`, `crawl_status`, `job_title`, `job_description`, `job_location`, `job_company`, `job_salary`, `job_type`, `job_posted_date`, `send_to_job_track` (checkbox).
 
 ## `crawl_status` values
 
@@ -19,5 +19,6 @@ Target worksheet name: **`jobs`** (never call it "Sheet A"). Downstream sheets a
 ## Write rules
 
 - Rejected/unsupported URLs still get a row with `crawl_status=rejected` — do not silently drop them after the chat reply.
+- New rows set `send_to_job_track` to unchecked (`FALSE`) and apply checkbox validation on that cell only (not on header connect). The bot never ticks it; humans (and out-of-scope Apps Script) own that column.
 - Use `gspread` + `google-auth` (service account). No hand-rolled Sheets HTTP.
 - Batch and minimize writes — Sheets API has real rate limits; do not design around per-message synchronous writes.
