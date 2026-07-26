@@ -5,11 +5,12 @@ from __future__ import annotations
 import pytest
 
 from job_scraper.scraper.dispatch import (
+    get_fetch_user_agent,
     get_parser,
     is_supported_site,
     is_well_formed_url,
 )
-from job_scraper.scraper.sites import example_site, jobstreet
+from job_scraper.scraper.sites import example_site, jobstreet, threads
 
 
 @pytest.mark.parametrize(
@@ -38,6 +39,10 @@ def test_is_well_formed_url(url: str, expected: bool) -> None:
         ("https://ID.JobStreet.com/job", True),
         ("https://example.com/ad", True),
         ("https://www.example.com/ad", True),
+        ("https://www.threads.com/@user/post/Abc", True),
+        ("https://threads.com/@user/post/Abc", True),
+        ("https://www.threads.net/@user/post/Abc", True),
+        ("https://threads.net/@user/post/Abc", True),
         ("https://jobs.example.org/ad", False),
         ("https://jobstreet.com/id/job/123", False),
         ("https://unsupported.example/job", False),
@@ -53,8 +58,29 @@ def test_is_supported_site(url: str, expected: bool) -> None:
         ("https://id.jobstreet.com/job/1", jobstreet.parse),
         ("https://www.id.jobstreet.com/job/1", jobstreet.parse),
         ("https://EXAMPLE.com/job", example_site.parse),
+        ("https://www.threads.com/@user/post/Abc", threads.parse),
+        ("https://threads.net/@user/post/Abc", threads.parse),
         ("https://unknown.example/job", None),
     ],
 )
 def test_get_parser(url: str, expected: object) -> None:
     assert get_parser(url) is expected
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("https://id.jobstreet.com/job/1", None),
+        ("https://example.com/job", None),
+        (
+            "https://www.threads.com/@user/post/Abc",
+            threads.FETCH_USER_AGENT,
+        ),
+        (
+            "https://threads.net/@user/post/Abc",
+            threads.FETCH_USER_AGENT,
+        ),
+    ],
+)
+def test_get_fetch_user_agent(url: str, expected: str | None) -> None:
+    assert get_fetch_user_agent(url) is expected

@@ -11,12 +11,17 @@ _DEFAULT_USER_AGENT = (
 )
 
 
-async def fetch_html(url: str, *, timeout: float = 30.0) -> str:
+async def fetch_html(
+    url: str,
+    *,
+    timeout: float = 30.0,
+    user_agent: str | None = None,
+) -> str:
     """GET ``url`` and return the response body as text.
 
     Raises ``httpx.HTTPStatusError`` on non-2xx responses.
     """
-    headers = {"User-Agent": _DEFAULT_USER_AGENT}
+    headers = {"User-Agent": user_agent or _DEFAULT_USER_AGENT}
     async with httpx.AsyncClient(
         headers=headers,
         follow_redirects=True,
