@@ -33,8 +33,10 @@ telegram-job-ad-scrapper/
 │           ├── dispatch.py    # site allowlist -> parser lookup
 │           ├── fetch.py       # async httpx fetch of a single URL
 │           └── sites/
-│               ├── example_site.py  # placeholder parser
-│               └── jobstreet.py     # id.jobstreet.com parser
+│               ├── models.py          # JobFields shared type
+│               ├── registry.py        # *_site discovery / allowlist
+│               ├── jobstreet_site.py  # id.jobstreet.com parser
+│               └── threads_site.py    # threads.com / threads.net parser
 ├── pyproject.toml
 ├── Containerfile
 ├── README.md
@@ -165,7 +167,8 @@ This is a scaffold. The following are real, working code:
 - `state.py` — JSON state-file read/write.
 - `scraper/dispatch.py` — URL well-formedness check and site-allowlist
   lookup mechanism.
-- `scraper/sites/jobstreet.py` — `id.jobstreet.com` job-detail parser.
+- `scraper/sites/jobstreet_site.py` — `id.jobstreet.com` job-detail parser.
+- `scraper/sites/threads_site.py` — Threads post parser.
 - `queue.py` — `asyncio.Queue` creation and worker-pool spawn/shutdown
   plumbing.
 
@@ -177,7 +180,5 @@ bodies) with no real behavior yet:
 - `telegram_bot.py` — `Bot` construction is real, but `run_listener` does
   not yet poll, validate, reply, or enqueue anything.
 - `queue.py`'s `process_job` — does not yet crawl, parse, or write results.
-- `scraper/sites/example_site.py` — a single placeholder parser returning
-  empty fields.
 - `main.py`'s Sheet-A re-enqueue-on-startup step and the listener startup
   call are both `TODO`.
