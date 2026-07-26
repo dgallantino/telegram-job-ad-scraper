@@ -12,13 +12,12 @@ Only URLs that pass both are enqueued for scraping; everything else gets a
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from urllib.parse import urlparse
 
-from job_scraper.scraper.sites import (
+from job_scraper.scraper.sites.models import ParserFunc
+from job_scraper.scraper.sites.registry import (
     SITE_ALLOWLIST,
     SITE_FETCH_USER_AGENTS,
-    ParserFunc,
 )
 
 

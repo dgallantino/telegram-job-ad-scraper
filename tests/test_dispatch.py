@@ -10,7 +10,7 @@ from job_scraper.scraper.dispatch import (
     is_supported_site,
     is_well_formed_url,
 )
-from job_scraper.scraper.sites import example_site, jobstreet, threads
+from job_scraper.scraper.sites import jobstreet_site, threads_site
 
 
 @pytest.mark.parametrize(
@@ -37,8 +37,8 @@ def test_is_well_formed_url(url: str, expected: bool) -> None:
         ("https://id.jobstreet.com/id/job/123", True),
         ("https://www.id.jobstreet.com/id/job/123", True),
         ("https://ID.JobStreet.com/job", True),
-        ("https://example.com/ad", True),
-        ("https://www.example.com/ad", True),
+        ("https://example.com/ad", False),
+        ("https://www.example.com/ad", False),
         ("https://www.threads.com/@user/post/Abc", True),
         ("https://threads.com/@user/post/Abc", True),
         ("https://www.threads.net/@user/post/Abc", True),
@@ -55,11 +55,11 @@ def test_is_supported_site(url: str, expected: bool) -> None:
 @pytest.mark.parametrize(
     ("url", "expected"),
     [
-        ("https://id.jobstreet.com/job/1", jobstreet.parse),
-        ("https://www.id.jobstreet.com/job/1", jobstreet.parse),
-        ("https://EXAMPLE.com/job", example_site.parse),
-        ("https://www.threads.com/@user/post/Abc", threads.parse),
-        ("https://threads.net/@user/post/Abc", threads.parse),
+        ("https://id.jobstreet.com/job/1", jobstreet_site.parse),
+        ("https://www.id.jobstreet.com/job/1", jobstreet_site.parse),
+        ("https://EXAMPLE.com/job", None),
+        ("https://www.threads.com/@user/post/Abc", threads_site.parse),
+        ("https://threads.net/@user/post/Abc", threads_site.parse),
         ("https://unknown.example/job", None),
     ],
 )
@@ -74,11 +74,11 @@ def test_get_parser(url: str, expected: object) -> None:
         ("https://example.com/job", None),
         (
             "https://www.threads.com/@user/post/Abc",
-            threads.FETCH_USER_AGENT,
+            threads_site.FETCH_USER_AGENT,
         ),
         (
             "https://threads.net/@user/post/Abc",
-            threads.FETCH_USER_AGENT,
+            threads_site.FETCH_USER_AGENT,
         ),
     ],
 )

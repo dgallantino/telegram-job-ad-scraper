@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from job_scraper.scraper.sites import JobFields
-from job_scraper.scraper.sites.jobstreet import parse
+from job_scraper.scraper.sites.jobstreet_site import parse
+from job_scraper.scraper.sites.models import JobFields
 
 _FIXTURES = Path(__file__).parent / "fixtures" / "jobstreet"
 

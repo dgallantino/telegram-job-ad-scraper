@@ -360,7 +360,7 @@ async def test_accepted_allowlisted_url(tmp_path: Path) -> None:
     queue: asyncio.Queue[Job] = asyncio.Queue()
     state = _state(tmp_path)
 
-    url = "https://example.com/job"
+    url = "https://id.jobstreet.com/job/123"
     text = f"apply {url}"
     msg = _message(text=text, entities=[_url_entity(text, url)], message_id=42)
     calls = {"n": 0}
@@ -486,7 +486,7 @@ async def test_multi_url_unique_job_ids(tmp_path: Path) -> None:
     queue: asyncio.Queue[Job] = asyncio.Queue()
     state = _state(tmp_path)
 
-    u1 = "https://example.com/a"
+    u1 = "https://id.jobstreet.com/job/a"
     u2 = "https://other.example/b"
     text = f"{u1} {u2}"
     msg = _message(

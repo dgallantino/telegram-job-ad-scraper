@@ -9,7 +9,7 @@ import httpx
 import pytest
 
 from job_scraper.queue import Job, process_job
-from job_scraper.scraper.sites import JobFields
+from job_scraper.scraper.sites.models import JobFields
 from job_scraper.sheets import (
     CRAWL_STATUS_FAILED,
     CRAWL_STATUS_FINISHED,

@@ -12,7 +12,7 @@ import re
 
 from bs4 import BeautifulSoup
 
-from job_scraper.scraper.sites import JobFields
+from job_scraper.scraper.sites.models import JobFields
 
 SITE_HOSTS = ("threads.com", "threads.net")
 
