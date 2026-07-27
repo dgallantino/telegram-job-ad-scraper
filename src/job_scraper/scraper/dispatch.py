@@ -12,11 +12,13 @@ Only URLs that pass both are enqueued for scraping; everything else gets a
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from urllib.parse import urlparse
 
-from job_scraper.scraper.sites import SITE_ALLOWLIST, ParserFunc
-
+from job_scraper.scraper.sites.models import ParserFunc
+from job_scraper.scraper.sites.registry import (
+    SITE_ALLOWLIST,
+    SITE_FETCH_USER_AGENTS,
+)
 
 
 def is_well_formed_url(url: str) -> bool:
@@ -44,3 +46,8 @@ def is_supported_site(url: str) -> bool:
 def get_parser(url: str) -> ParserFunc | None:
     """Look up the parser function registered for ``url``'s host, if any."""
     return SITE_ALLOWLIST.get(_normalize_host(url))
+
+
+def get_fetch_user_agent(url: str) -> str | None:
+    """Return a site-specific fetch User-Agent for ``url``, if any."""
+    return SITE_FETCH_USER_AGENTS.get(_normalize_host(url))

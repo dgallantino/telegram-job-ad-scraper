@@ -9,7 +9,7 @@ import httpx
 import pytest
 
 from job_scraper.queue import Job, process_job
-from job_scraper.scraper.sites import JobFields
+from job_scraper.scraper.sites.models import JobFields
 from job_scraper.sheets import (
     CRAWL_STATUS_FAILED,
     CRAWL_STATUS_FINISHED,
@@ -49,6 +49,10 @@ async def test_process_job_finished() -> None:
     with (
         patch("job_scraper.queue.get_parser", return_value=parser) as get_parser,
         patch(
+            "job_scraper.queue.get_fetch_user_agent",
+            return_value=None,
+        ) as get_ua,
+        patch(
             "job_scraper.queue.fetch_html",
             new_callable=AsyncMock,
             return_value="<html/>",
@@ -58,7 +62,8 @@ async def test_process_job_finished() -> None:
 
     sheets.update_status.assert_called_once_with(job.job_id, CRAWL_STATUS_RUNNING)
     get_parser.assert_called_once_with(job.url)
-    fetch.assert_awaited_once_with(job.url)
+    get_ua.assert_called_once_with(job.url)
+    fetch.assert_awaited_once_with(job.url, user_agent=None)
     parser.assert_called_once_with("<html/>")
     sheets.update_result.assert_called_once_with(
         job.job_id, CRAWL_STATUS_FINISHED, asdict(fields)

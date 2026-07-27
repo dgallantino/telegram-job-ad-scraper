@@ -14,7 +14,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from job_scraper.scraper.dispatch import get_parser
+from job_scraper.scraper.dispatch import get_fetch_user_agent, get_parser
 from job_scraper.scraper.fetch import fetch_html
 from job_scraper.sheets import (
     CRAWL_STATUS_FAILED,
@@ -63,7 +63,10 @@ async def process_job(job: Job, sheets: SheetsClient, on_finish: OnFinish) -> No
         parser = get_parser(job.url)
         if parser is None:
             raise RuntimeError(f"no parser registered for {job.url!r}")
-        html = await fetch_html(job.url)
+        html = await fetch_html(
+            job.url,
+            user_agent=get_fetch_user_agent(job.url),
+        )
         fields = asdict(parser(html))
         status = CRAWL_STATUS_FINISHED
     except Exception:  # noqa: BLE001 - record failed status; do not kill worker

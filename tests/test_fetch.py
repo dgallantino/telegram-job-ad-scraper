@@ -32,6 +32,27 @@ async def test_fetch_html_returns_body_on_200() -> None:
 
 
 @pytest.mark.asyncio
+async def test_fetch_html_uses_override_user_agent() -> None:
+    response = MagicMock()
+    response.text = "<html>ok</html>"
+    response.raise_for_status = MagicMock()
+    client = _mock_client(response)
+
+    with patch(
+        "job_scraper.scraper.fetch.httpx.AsyncClient",
+        return_value=client,
+    ) as async_client:
+        await fetch_html(
+            "https://www.threads.com/@user/post/Abc",
+            user_agent="facebookexternalhit/1.1",
+        )
+
+    async_client.assert_called_once()
+    kwargs = async_client.call_args.kwargs
+    assert kwargs["headers"]["User-Agent"] == "facebookexternalhit/1.1"
+
+
+@pytest.mark.asyncio
 async def test_fetch_html_raises_on_non_2xx() -> None:
     request = httpx.Request("GET", "https://example.com/missing")
     response = httpx.Response(404, request=request)

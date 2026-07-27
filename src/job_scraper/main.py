@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 
 from job_scraper import queue as job_queue
 from job_scraper import telegram_bot
@@ -76,7 +77,9 @@ async def _reenqueue_incomplete_jobs(
 
 async def run() -> None:
     """Build all components and run until cancelled (e.g. SIGINT/SIGTERM)."""
-    logging.basicConfig(level=logging.INFO)
+    # anti pattern: use environment variable to configure logging level
+    level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
+    logging.basicConfig(level=getattr(logging, level_name, logging.INFO))
     # PTB uses httpx; its INFO request lines include the bot token in the URL.
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)

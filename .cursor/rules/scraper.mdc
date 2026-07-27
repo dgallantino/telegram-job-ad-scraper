@@ -18,6 +18,6 @@ alwaysApply: false
 
 ## Site parsers (`scraper/sites/`)
 
-- One module per site.
-- Expected shape: HTML → job-fields dict matching `jobs` sheet columns (`job_title`, `job_description`, `job_location`, `job_company`, `job_salary`, `job_type`, `job_posted_date`, etc.).
-- Each module exports `SITE_HOST` (hostname, lowercase, no `www.`) and `parse`; `sites/__init__.py` auto-registers them into `SITE_ALLOWLIST`. No manual dispatch edit.
+- One `*_site.py` module per site. Shared types live in `models.py`; allowlist registration lives in `registry.py`. Keep `__init__.py` empty of code (docstring only).
+- Expected shape: HTML → job-fields matching `jobs` sheet columns (`job_title`, `job_description`, `job_location`, `job_company`, `job_salary`, `job_type`, `job_posted_date`, etc.).
+- Each `*_site` module exports `SITE_HOST` (hostname, lowercase, no `www.`) or `SITE_HOSTS`, and `parse`; `registry.py` auto-registers only modules whose name ends with `_site` into `SITE_ALLOWLIST`. No manual dispatch edit.
